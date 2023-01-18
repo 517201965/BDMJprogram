@@ -10,6 +10,10 @@ namespace BDMJprogram
     {
         static void Main(string[] args)
         {
+            Game game = new Game();
+            game.Initial();
+            game.FapaiBaida();
         }
+
     }
 }
