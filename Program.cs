@@ -12,8 +12,9 @@ namespace BDMJprogram
         static void Main(string[] args)
         {
             Game game = new Game();
-            game.Initial();
+            game.Initial(ZUOWEI.Nan);
             game.FapaiBaida();
+            game.StartLoop();
             Console.ReadKey();
         }
 
