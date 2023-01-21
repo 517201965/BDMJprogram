@@ -108,30 +108,127 @@ namespace BDMJprogram
 
             //初始信息
             int whosTurn = ZhuangJia;
-            ShouPai whosShouPai = shouPai[whosTurn - 1];
+            ShouPai whosShouPai = new ShouPai();
             bool iCGP = false;
             string command = string.Empty;
             int iLoop = 1;
             do 
             {
-                whosShouPai = shouPai[whosTurn - 1];
                 Recording.WriteLine("【回合数量】" + iLoop.ToString("00")); iLoop++;
                 Recording.WriteLine("【最近出牌】" + LastChuPai.ToString("00"));
+
                 //吃碰杠抓确认
+                int[] iFlagCmd = new int[4] { 0, 0, 0, 0 };
+                string[] strCmdRecord = new string[4];
+                iFlagCmd[whosTurn] = CPGZ_Level.Pass;
                 if (LastChuPai != 0)
                 {
+                    bool isCPGZover = false;
+                    do
+                    {
+                        //检查每个玩家的状态
+                        Recording.WriteLine(string.Format("【等待指令】吃碰杠抓;东,{0};南,{1};西,{2};北,{3}", CPGZ_Level.Level_Zh[iFlagCmd[0]], CPGZ_Level.Level_Zh[iFlagCmd[1]], CPGZ_Level.Level_Zh[iFlagCmd[2]], CPGZ_Level.Level_Zh[iFlagCmd[3]]));
+                        command = Console.ReadLine();
+                        Recording.WriteLine("【返回指令】" + command);
+                        string[] cmd1 = command.Split(';');
+                        if (cmd1.Length == 3)
+                        {
+                            int iWhosCmd = 5;
+                            //检查谁的指令
+                            switch (cmd1[0])
+                            {
+                                case "东": strCmdRecord[0] = command; iWhosCmd = 0; break;
+                                case "南": strCmdRecord[1] = command; iWhosCmd = 1; break;
+                                case "西": strCmdRecord[2] = command; iWhosCmd = 2; break;
+                                case "北": strCmdRecord[3] = command; iWhosCmd = 3; break;
+                                default: break;
+                            }
+                            //判定指令优先级，以及是否有效
+                            if (iWhosCmd < 5)
+                            {
+                                switch (cmd1[1])
+                                {
+                                    case "过":
+                                        iFlagCmd[iWhosCmd] = CPGZ_Level.Pass;
+                                        break;
+                                    case "吃":
+                                        int[] iChi = new int[3];
+                                        string[] iOrderC = cmd1[2].Split(',');
+                                        if (iOrderC.Length == 2)
+                                        {
+                                            iChi[0] = LastChuPai;
+                                            iChi[1] = shouPai[iWhosCmd].info[Convert.ToInt32(iOrderC[0])];
+                                            iChi[2] = shouPai[iWhosCmd].info[Convert.ToInt32(iOrderC[1])];
+                                            Array.Sort(iChi);
+                                            if ((iChi[2] - iChi[1] == 1) && (iChi[1] - iChi[0] == 1))
+                                            {
+                                                iFlagCmd[iWhosCmd] = CPGZ_Level.Chi;
+                                            }
+                                        }
+                                        break;
+                                    case "碰":
+                                        int[] iPeng = new int[3];
+                                        string[] iOrderP = cmd1[2].Split(',');
+                                        if (iOrderP.Length == 2)
+                                        {
+                                            iPeng[0] = LastChuPai;
+                                            iPeng[1] = shouPai[iWhosCmd].info[Convert.ToInt32(iOrderP[0])];
+                                            iPeng[2] = shouPai[iWhosCmd].info[Convert.ToInt32(iOrderP[1])];
+                                            Array.Sort(iPeng);
+                                            if ((iPeng[0] == iPeng[1]) && (iPeng[0] == iPeng[2]) && (iPeng[1] == iPeng[2])) 
+                                            {
+                                                iFlagCmd[iWhosCmd] = CPGZ_Level.Peng;
+                                            }
+                                        }
+                                        break;
+                                    case "杠": break;
+                                    case "抓": break;
+                                    default: break;
+                                }
+                            }
+                        }
+                        //检查每个玩家状态，是否已经完成指令
+                        isCPGZover = (iFlagCmd[0] != 0) && (iFlagCmd[1] != 0) && (iFlagCmd[2] != 0) && (iFlagCmd[3] != 0);
+                    } while (isCPGZover == false);
 
+                    //如果没有人吃碰杠抓，则轮到下家
+                    if (iFlagCmd.Sum() == 4)
+                        whosTurn = ZUOWEI.Next(whosTurn);
+                    else //有人吃碰杠抓
+                    {
+                        whosTurn = ArrarMaxIndex(iFlagCmd);
+                        whosShouPai = shouPai[whosTurn];
+                        //执行吃碰杠抓指令
+                        int icmd = iFlagCmd[whosTurn];
+                        if (icmd == CPGZ_Level.Chi)
+                        {
+
+                        }
+                        else if(icmd == CPGZ_Level.Peng)
+                        {
+
+                        }
+                        else if (icmd == CPGZ_Level.Gang)
+                        {
+
+                        }
+                        else if (icmd == CPGZ_Level.Zhua)
+                        {
+
+                        }
+                    }
                 }
                 else
                     Recording.WriteLine("【吃碰杠抓】庄家首轮跳过");
 
                 //确认回合
+                whosShouPai = shouPai[whosTurn];
                 Recording.WriteLine("【谁的回合】" + ZUOWEI.FengXiang[whosShouPai.Zuowei]);
 
                 //摸花
                 UpdateShouPaiHua(whosShouPai);
 
-                //摸牌&重新判定摸花
+                //摸牌&摸花
                 if (iCGP == false) //如果没有吃碰杠，则摸牌
                 {
                     whosShouPai.info[13] = PaiKu.Dequeue();
@@ -140,11 +237,11 @@ namespace BDMJprogram
 
                 UpdateShouPaiInfo();
 
-                //等待杠胡出牌指令
-                Recording.WriteLine("【等待指令】出杠胡");
+                //等待出杠胡牌指令
                 bool isOver = false;
                 do
                 {
+                    Recording.WriteLine(string.Format("【等待指令】出杠胡;{0},等", ZUOWEI.FengXiang[whosShouPai.Zuowei]));
                     command = Console.ReadLine();
                     Recording.WriteLine("【返回指令】" + command);
                     string[] cmd2 = command.Split(';');
@@ -157,7 +254,8 @@ namespace BDMJprogram
                                 LastChuPai = whosShouPai.info[iChuPaiOrder];
                                 whosShouPai.info[iChuPaiOrder] = 99;
                                 whosShouPai.LiPai2();
-                                whosTurn = ZUOWEI.Next(whosTurn);
+                                whosShouPai.HistoryPai.Enqueue(LastChuPai);
+                                //whosTurn = ZUOWEI.Next(whosTurn);
                                 isOver = true;
                                 break;
                             case "杠": break;
@@ -227,6 +325,32 @@ namespace BDMJprogram
             return randomList;
         }
 
+        /// <summary>
+        /// 返回数组中最大值的索引
+        /// </summary>
+        /// <param name="arr">需要计算的数组</param>
+        /// <returns></returns>
+        private static int ArrarMaxIndex(int[] arr)
+        {
+            int index = 0;
+            int value = arr[0];
+
+            for (int i = 0; i < arr.Length; i++) 
+            {
+                int _value = arr[i];
+                if (_value.CompareTo(value) > 0)
+                {
+                    value = _value;
+                    index = i;
+                }
+            }
+
+            return index;
+        }
+
+        /// <summary>
+        /// 文字更新牌库信息
+        /// </summary>
         void UpdatePaikuInfo()
         {
             string PaiKuInfo = "【剩余牌库】";
@@ -241,6 +365,9 @@ namespace BDMJprogram
             Recording.WriteLine(PaiKuSum);
         }
 
+        /// <summary>
+        /// 文字更新手牌信息
+        /// </summary>
         void UpdateShouPaiInfo()
         {
             for (int j = 0; j < 4; j++)
@@ -275,6 +402,7 @@ namespace BDMJprogram
         public int[] hua = new int[8] { 99, 99, 99, 99, 99, 99, 99, 99 };
         public bool isZhuang = false;
         public bool[] isShow = new bool[14];
+        public Queue<int> HistoryPai = new Queue<int>();
 
         /// <summary>
         /// 升序理牌
@@ -315,18 +443,29 @@ namespace BDMJprogram
     }
     public static class ZUOWEI
     {
-        static public int Kong = 0;
-        static public int Dong = 1;
-        static public int Nan = 2;
-        static public int Xi = 3;
-        static public int Bei = 4;
-        static public string[] FengXiang = new string[5] { "空", "东", "南", "西", "北" };
+        static public int Kong = 4;
+        static public int Dong = 0;
+        static public int Nan = 1;
+        static public int Xi = 2;
+        static public int Bei = 3;
+        static public string[] FengXiang = new string[5] { "东", "南", "西", "北", "空" };
         static public int Next(int iCurrent)
         {
             iCurrent++;
             if (iCurrent > 4) iCurrent = 1;
             return iCurrent;
         }
+    }
+
+    public static class CPGZ_Level
+    {
+        static public int Wait = 0;
+        static public int Pass = 1;
+        static public int Chi = 2;
+        static public int Peng = 3;
+        static public int Gang = 4;
+        static public int Zhua = 5;
+        static public string[] Level_Zh = new string[6] { "等", "过", "吃", "碰", "杠", "抓" };
     }
 
     public static class Recording
