@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.IO;
+using System.IO.Pipes;
 
 namespace BDMJprogram
 {
@@ -14,7 +16,7 @@ namespace BDMJprogram
                                      21, 21, 21, 21, 22, 22, 22, 22, 23, 23, 23, 23, 24, 24, 24, 24, 25, 25, 25, 25, 26, 26, 26, 26, 27, 27, 27, 27, 28, 28, 28, 28, 29, 29, 29, 29, //筒 1111,2222,3333,4444,5555,6666,7777,8888,9999 (36)
                                      31, 31, 31, 31, 32, 32, 32, 32, 33, 33, 33, 33, 34, 34, 34, 34, //风 东东东东,南南南南,西西西西,北北北北 (16)
                                      41, 41, 41, 41, 42, 42, 42, 42, 43, 43, 43, 43, //字 中中中中,发发发发,白白白白 (12)
-                                     51, 52, 53, 54, 55, 56, 57, 58 }; //花 春夏秋冬,梅兰竹菊 (8)
+                                     51, 52, 53, 54, 55, 56, 57, 58 }; //花 春夏秋冬,梅兰菊竹 (8)
 
         Queue<int> PaiKu = new Queue<int>();
         List<int> Touzi = new List<int>();
@@ -54,7 +56,8 @@ namespace BDMJprogram
             Touzi.Clear();
             rm = new Random();
             Touzi = GetRandom(1, 6, 2, rm, true);
-            Recording.WriteLine("【骰子结果】" + Touzi.First() + "," + Touzi.Last());
+            Recording.Last_TouziResult = string.Format("【骰子结果】" + Touzi.First() + "," + Touzi.Last());
+            Recording.WriteLine(Recording.Last_TouziResult);
 
             //手牌初始化
             shouPai[0] = new ShouPai() { Zuowei = ZUOWEI.Dong }; 
@@ -72,7 +75,8 @@ namespace BDMJprogram
             {
                 BaiDa = PaiKu.Dequeue();
             } while (BaiDa > 50);
-            Recording.WriteLine("【百搭麻将】"+BaiDa.ToString("00"));
+            Recording.Last_Baida = string.Format("【百搭麻将】" + BaiDa.ToString("00"));
+            Recording.WriteLine(Recording.Last_Baida);
 
             //发牌
             int LastPai = 0;
@@ -127,7 +131,9 @@ namespace BDMJprogram
                     do
                     {
                         //检查每个玩家的状态
-                        Recording.WriteLine(string.Format("【等待指令】吃碰杠抓;东,{0};南,{1};西,{2};北,{3}", CPGZ_Level.Level_Zh[iFlagCmd[0]], CPGZ_Level.Level_Zh[iFlagCmd[1]], CPGZ_Level.Level_Zh[iFlagCmd[2]], CPGZ_Level.Level_Zh[iFlagCmd[3]]));
+                        string strCommand = string.Format("【等待指令】吃碰杠抓;东,{0};南,{1};西,{2};北,{3}", CPGZ_Level.Level_Zh[iFlagCmd[0]], CPGZ_Level.Level_Zh[iFlagCmd[1]], CPGZ_Level.Level_Zh[iFlagCmd[2]], CPGZ_Level.Level_Zh[iFlagCmd[3]]);
+                        Recording.WriteLine(strCommand);
+                        UpdateTransmitInfo(strCommand);
                         command = Console.ReadLine();
                         Recording.WriteLine("【返回指令】" + command);
                         string[] cmd1 = command.Split(';');
@@ -241,7 +247,9 @@ namespace BDMJprogram
                 bool isOver = false;
                 do
                 {
-                    Recording.WriteLine(string.Format("【等待指令】出杠胡;{0},等", ZUOWEI.FengXiang[whosShouPai.Zuowei]));
+                    string strCommand = string.Format("【等待指令】出杠胡,{0},等", ZUOWEI.FengXiang[whosShouPai.Zuowei]);
+                    Recording.WriteLine(strCommand);
+                    UpdateTransmitInfo(strCommand);
                     command = Console.ReadLine();
                     Recording.WriteLine("【返回指令】" + command);
                     string[] cmd2 = command.Split(';');
@@ -361,6 +369,9 @@ namespace BDMJprogram
                 PaiKuInfo += i.ToString("00") + ",";
             }
             PaiKuSum += PaiKu.Count;
+
+            Recording.Last_PaikuSum = PaiKuSum;
+            Recording.Last_PaikuInfo = PaiKuInfo;
             Recording.WriteLine(PaiKuInfo);
             Recording.WriteLine(PaiKuSum);
         }
@@ -389,9 +400,51 @@ namespace BDMJprogram
                 shouPaiMsg += "【庄】";
                 if (shouPai[j].isZhuang) shouPaiMsg += "是";
                 else shouPaiMsg += "否";
+                Recording.Last_ShoupaiInfo[j] = shouPaiMsg;
                 Recording.WriteLine(shouPaiMsg);
             }
         }
+
+        /// <summary>
+        /// 更新传输数据并发送
+        /// </summary>
+        /// <param name="command"></param>
+        void UpdateTransmitInfo(string command)
+        {
+            string msg = string.Empty;
+            msg += Recording.Last_PaikuSum + ";";
+            msg += Recording.Last_PaikuInfo + ";";
+            msg += Recording.Last_TouziResult + ";";
+            msg += Recording.Last_Baida + ";";
+            msg += Recording.Last_ShoupaiInfo[0] + ";";
+            msg += Recording.Last_ShoupaiInfo[1] + ";";
+            msg += Recording.Last_ShoupaiInfo[2] + ";";
+            msg += Recording.Last_ShoupaiInfo[3] + ";";
+            msg += command;
+            Recording.WriteLine(msg);
+        }
+
+        #region NamePipe 
+        NamedPipeClientStream pipeClient = null;
+        public void ConnectToServer()
+        {
+            using (pipeClient = new NamedPipeClientStream(".", "testpipe", PipeDirection.InOut))
+            {
+                pipeClient.Connect();
+
+                using (StreamReader sr = new StreamReader(pipeClient))
+                {
+                    var data = new byte[10240];
+                    data = System.Text.Encoding.Default.GetBytes("Connecting");
+                    pipeClient.Write(data, 0, data.Length);
+
+                    string temp;
+                    while ((temp = sr.ReadLine()) == null) ;
+                    Console.WriteLine(temp);
+                }
+            }
+        }
+        #endregion
     }
 
     class ShouPai
@@ -401,7 +454,6 @@ namespace BDMJprogram
         public int[,] CPG = new int[4, 4] { { 99, 99, 99, 99 }, { 99, 99, 99, 99 }, { 99, 99, 99, 99 }, { 99, 99, 99, 99 } };
         public int[] hua = new int[8] { 99, 99, 99, 99, 99, 99, 99, 99 };
         public bool isZhuang = false;
-        public bool[] isShow = new bool[14];
         public Queue<int> HistoryPai = new Queue<int>();
 
         /// <summary>
@@ -470,6 +522,11 @@ namespace BDMJprogram
 
     public static class Recording
     {
+        public static string Last_PaikuSum = string.Empty;
+        public static string Last_PaikuInfo = string.Empty;
+        public static string Last_TouziResult = string.Empty;
+        public static string Last_Baida = string.Empty;
+        public static string[] Last_ShoupaiInfo = new string[4];
         public static void WriteLine(string msg)
         {
             Console.WriteLine("[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "]" + msg);

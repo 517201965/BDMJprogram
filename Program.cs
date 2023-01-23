@@ -11,10 +11,15 @@ namespace BDMJprogram
     {
         static void Main(string[] args)
         {
+            //NamePipe pipe = new NamePipe();
+            //pipe.ConnectToServer();
+
             Game game = new Game();
+            game.ConnectToServer();
             game.Initial(ZUOWEI.Nan);
             game.FapaiBaida();
             game.StartLoop();
+
             Console.ReadKey();
         }
 
