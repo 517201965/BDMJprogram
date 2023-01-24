@@ -15,13 +15,17 @@ namespace BDMJprogram
             //pipe.ConnectToServer();
 
             Game game = new Game();
-            game.ConnectToServer();
-            game.Initial(ZUOWEI.Nan);
-            game.FapaiBaida();
-            game.StartLoop();
+            if(game.CreateServer())
+            {
+                game.Initial(ZUOWEI.Nan);
+                game.FapaiBaida();
+                game.StartLoop();
+            }
 
             Console.ReadKey();
         }
 
     }
+
+
 }

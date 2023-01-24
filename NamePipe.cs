@@ -10,23 +10,46 @@ namespace BDMJprogram
 {
     class NamePipe
     {
-        public void ConnectToServer()
+
+    }
+
+    // Defines the data protocol for reading and writing strings on our stream.
+    public class StreamString
+    {
+        private Stream ioStream;
+        private UnicodeEncoding streamEncoding;
+
+        public StreamString(Stream ioStream)
         {
-            using (NamedPipeClientStream pipeClient = new NamedPipeClientStream(".", "testpipe", PipeDirection.InOut))
+            this.ioStream = ioStream;
+            streamEncoding = new UnicodeEncoding();
+        }
+
+        public string ReadString()
+        {
+            int len;
+            len = ioStream.ReadByte() * 256;
+            len += ioStream.ReadByte();
+            var inBuffer = new byte[len];
+            ioStream.Read(inBuffer, 0, len);
+
+            return streamEncoding.GetString(inBuffer);
+        }
+
+        public int WriteString(string outString)
+        {
+            byte[] outBuffer = streamEncoding.GetBytes(outString);
+            int len = outBuffer.Length;
+            if (len > UInt16.MaxValue)
             {
-                pipeClient.Connect();
-
-                using (StreamReader sr = new StreamReader(pipeClient))
-                {
-                    var data = new byte[10240];
-                    data = System.Text.Encoding.Default.GetBytes("send to server");
-                    pipeClient.Write(data, 0, data.Length);
-
-                    string temp;
-                    while ((temp = sr.ReadLine()) == null) ;
-                    Console.WriteLine(temp);                    
-                }
+                len = (int)UInt16.MaxValue;
             }
+            ioStream.WriteByte((byte)(len / 256));
+            ioStream.WriteByte((byte)(len & 255));
+            ioStream.Write(outBuffer, 0, len);
+            ioStream.Flush();
+
+            return outBuffer.Length + 2;
         }
     }
 }

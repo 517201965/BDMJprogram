@@ -90,7 +90,7 @@ namespace BDMJprogram
                 }
             }
 
-            shouPai[ZhuangJia - 1].isZhuang = true;
+            shouPai[ZhuangJia].isZhuang = true;
 
             #region 记录
             UpdateShouPaiInfo(); 
@@ -133,8 +133,8 @@ namespace BDMJprogram
                         //检查每个玩家的状态
                         string strCommand = string.Format("【等待指令】吃碰杠抓;东,{0};南,{1};西,{2};北,{3}", CPGZ_Level.Level_Zh[iFlagCmd[0]], CPGZ_Level.Level_Zh[iFlagCmd[1]], CPGZ_Level.Level_Zh[iFlagCmd[2]], CPGZ_Level.Level_Zh[iFlagCmd[3]]);
                         Recording.WriteLine(strCommand);
-                        UpdateTransmitInfo(strCommand);
-                        command = Console.ReadLine();
+                        command = UpdateTransmitInfo_ReturnCommand(strCommand);
+                        //command = Console.ReadLine();
                         Recording.WriteLine("【返回指令】" + command);
                         string[] cmd1 = command.Split(';');
                         if (cmd1.Length == 3)
@@ -249,8 +249,8 @@ namespace BDMJprogram
                 {
                     string strCommand = string.Format("【等待指令】出杠胡,{0},等", ZUOWEI.FengXiang[whosShouPai.Zuowei]);
                     Recording.WriteLine(strCommand);
-                    UpdateTransmitInfo(strCommand);
-                    command = Console.ReadLine();
+                    command = UpdateTransmitInfo_ReturnCommand(strCommand);
+                    //command = Console.ReadLine();
                     Recording.WriteLine("【返回指令】" + command);
                     string[] cmd2 = command.Split(';');
                     if (cmd2.Length == 3)
@@ -406,10 +406,10 @@ namespace BDMJprogram
         }
 
         /// <summary>
-        /// 更新传输数据并发送
+        /// 更新传输数据并发送,等待指令的返回
         /// </summary>
         /// <param name="command"></param>
-        void UpdateTransmitInfo(string command)
+        string  UpdateTransmitInfo_ReturnCommand(string command)
         {
             string msg = string.Empty;
             msg += Recording.Last_PaikuSum + ";";
@@ -422,27 +422,54 @@ namespace BDMJprogram
             msg += Recording.Last_ShoupaiInfo[3] + ";";
             msg += command;
             Recording.WriteLine(msg);
+            PipeSendToServer(msg);
+            return Console.ReadLine();
         }
 
         #region NamePipe 
-        NamedPipeClientStream pipeClient = null;
-        public void ConnectToServer()
+
+        bool pipeClientConnected = false;
+        NamedPipeServerStream pipeServer = null;
+        StreamString streamServer = null;
+        public bool CreateServer()
         {
-            using (pipeClient = new NamedPipeClientStream(".", "testpipe", PipeDirection.InOut))
+            pipeServer = new NamedPipeServerStream("testpipe", PipeDirection.InOut);
+
+            pipeServer.WaitForConnection();
+
+            try
             {
-                pipeClient.Connect();
-
-                using (StreamReader sr = new StreamReader(pipeClient))
+                streamServer = new StreamString(pipeServer); 
+                streamServer.WriteString("BDMJServer");
+                string msg = streamServer.ReadString();
+                if (msg == "BDMJClient")
                 {
-                    var data = new byte[10240];
-                    data = System.Text.Encoding.Default.GetBytes("Connecting");
-                    pipeClient.Write(data, 0, data.Length);
-
-                    string temp;
-                    while ((temp = sr.ReadLine()) == null) ;
-                    Console.WriteLine(temp);
+                    pipeClientConnected = true;
+                    Console.WriteLine("BDMJClient Connected");
                 }
             }
+            catch (IOException e)
+            {
+                Console.WriteLine("ERROR: {0}", e.Message);
+            }
+            return pipeClientConnected;
+        }
+
+        void PipeSendToServer(string msg)
+        {
+            bool isCommandCorrect = false;
+            do
+            {
+                string ClientMsg = streamServer.ReadString();
+                if(ClientMsg == "Request")
+                {
+                    streamServer.WriteString(msg);
+                }
+                else
+                {
+                    isCommandCorrect = true;
+                }
+            } while (isCommandCorrect == false);
         }
         #endregion
     }
