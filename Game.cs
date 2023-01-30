@@ -119,7 +119,8 @@ namespace BDMJprogram
             do 
             {
                 Recording.WriteLine("【回合数量】" + iLoop.ToString("00")); iLoop++;
-                Recording.WriteLine("【最近出牌】" + LastChuPai.ToString("00"));
+                Recording.Last_Chupai = string.Format("【最近出牌】" + LastChuPai.ToString("00"));
+                Recording.WriteLine(Recording.Last_Chupai);
 
                 //吃碰杠抓确认
                 int[] iFlagCmd = new int[4] { 0, 0, 0, 0 };
@@ -131,7 +132,7 @@ namespace BDMJprogram
                     do
                     {
                         //检查每个玩家的状态
-                        string strCommand = string.Format("【等待指令】吃碰杠抓;东,{0};南,{1};西,{2};北,{3}", CPGZ_Level.Level_Zh[iFlagCmd[0]], CPGZ_Level.Level_Zh[iFlagCmd[1]], CPGZ_Level.Level_Zh[iFlagCmd[2]], CPGZ_Level.Level_Zh[iFlagCmd[3]]);
+                        string strCommand = string.Format("【等待指令】吃碰杠抓过,东,{0},南,{1},西,{2},北,{3}", CPGZ_Level.Level_Zh[iFlagCmd[0]], CPGZ_Level.Level_Zh[iFlagCmd[1]], CPGZ_Level.Level_Zh[iFlagCmd[2]], CPGZ_Level.Level_Zh[iFlagCmd[3]]);
                         Recording.WriteLine(strCommand);
                         command = UpdateTransmitInfo_ReturnCommand(strCommand);
                         //command = Console.ReadLine();
@@ -241,7 +242,8 @@ namespace BDMJprogram
                     UpdateShouPaiHua(whosShouPai);
                 }
 
-                UpdateShouPaiInfo();
+                UpdatePaikuInfo();//更新牌库信息
+                UpdateShouPaiInfo();//更新手牌信息
 
                 //等待出杠胡牌指令
                 bool isOver = false;
@@ -400,6 +402,15 @@ namespace BDMJprogram
                 shouPaiMsg += "【庄】";
                 if (shouPai[j].isZhuang) shouPaiMsg += "是";
                 else shouPaiMsg += "否";
+                shouPaiMsg += ",";
+                //出牌信息
+                shouPaiMsg += "【出牌】";
+                if (shouPai[j].HistoryPai.Count > 0)
+                {
+                    foreach (int i in shouPai[j].HistoryPai)
+                        shouPaiMsg += i.ToString("00") + ",";
+                }
+
                 Recording.Last_ShoupaiInfo[j] = shouPaiMsg;
                 Recording.WriteLine(shouPaiMsg);
             }
@@ -416,14 +427,15 @@ namespace BDMJprogram
             msg += Recording.Last_PaikuInfo + ";";
             msg += Recording.Last_TouziResult + ";";
             msg += Recording.Last_Baida + ";";
+            msg += Recording.Last_Chupai + ";";
             msg += Recording.Last_ShoupaiInfo[0] + ";";
             msg += Recording.Last_ShoupaiInfo[1] + ";";
             msg += Recording.Last_ShoupaiInfo[2] + ";";
             msg += Recording.Last_ShoupaiInfo[3] + ";";
             msg += command;
             Recording.WriteLine(msg);
-            PipeSendToServer(msg);
-            return Console.ReadLine();
+            return PipeSendToServer(msg);
+            //return Console.ReadLine();
         }
 
         #region NamePipe 
@@ -455,12 +467,13 @@ namespace BDMJprogram
             return pipeClientConnected;
         }
 
-        void PipeSendToServer(string msg)
+        string PipeSendToServer(string msg)
         {
             bool isCommandCorrect = false;
+            string ClientMsg = string.Empty;
             do
             {
-                string ClientMsg = streamServer.ReadString();
+                ClientMsg = streamServer.ReadString();
                 if(ClientMsg == "Request")
                 {
                     streamServer.WriteString(msg);
@@ -470,6 +483,8 @@ namespace BDMJprogram
                     isCommandCorrect = true;
                 }
             } while (isCommandCorrect == false);
+
+            return ClientMsg;
         }
         #endregion
     }
@@ -530,8 +545,9 @@ namespace BDMJprogram
         static public string[] FengXiang = new string[5] { "东", "南", "西", "北", "空" };
         static public int Next(int iCurrent)
         {
-            iCurrent++;
-            if (iCurrent > 4) iCurrent = 1;
+            iCurrent--;
+            if (iCurrent > Bei) iCurrent = Dong;
+            if (iCurrent < Dong) iCurrent = Bei;
             return iCurrent;
         }
     }
@@ -553,6 +569,7 @@ namespace BDMJprogram
         public static string Last_PaikuInfo = string.Empty;
         public static string Last_TouziResult = string.Empty;
         public static string Last_Baida = string.Empty;
+        public static string Last_Chupai = string.Empty;
         public static string[] Last_ShoupaiInfo = new string[4];
         public static void WriteLine(string msg)
         {
