@@ -40,6 +40,10 @@ namespace BDMJprogram
             Random rm = new Random();
             templist = GetRandom(0, 143, 144, rm, false);
             PaiKu.Clear();
+            templist[3] = 3;
+            templist[7] = 3;
+            templist[11] = 3;
+            templist[15] = 3;
             foreach (int i in templist)
             {
                 #region 记录
@@ -113,13 +117,13 @@ namespace BDMJprogram
             //初始信息
             int whosTurn = ZhuangJia;
             ShouPai whosShouPai = new ShouPai();
-            bool iCGP = false;
+            int iCGP = 0;
             string command = string.Empty;
             int iLoop = 1;
             do 
             {
                 Recording.WriteLine("【回合数量】" + iLoop.ToString("00")); iLoop++;
-                Recording.Last_Chupai = string.Format("【最近出牌】" + LastChuPai.ToString("00"));
+                Recording.Last_Chupai = string.Format("【最近出牌】" + LastChuPai.ToString("00") + "," + ZUOWEI.FengXiang[whosTurn]);
                 Recording.WriteLine(Recording.Last_Chupai);
 
                 //吃碰杠抓确认
@@ -128,6 +132,7 @@ namespace BDMJprogram
                 iFlagCmd[whosTurn] = CPGZ_Level.Pass;
                 if (LastChuPai != 0)
                 {
+                    #region 吃碰杠抓过
                     bool isCPGZover = false;
                     do
                     {
@@ -188,8 +193,25 @@ namespace BDMJprogram
                                             }
                                         }
                                         break;
-                                    case "杠": break;
-                                    case "抓": break;
+                                    case "杠":
+                                        int[] iGang = new int[4];
+                                        string[] iOrderG = cmd1[2].Split(',');
+                                        if (iOrderG.Length == 3)
+                                        {
+                                            iGang[0] = LastChuPai;
+                                            iGang[1] = shouPai[iWhosCmd].info[Convert.ToInt32(iOrderG[0])];
+                                            iGang[2] = shouPai[iWhosCmd].info[Convert.ToInt32(iOrderG[1])];
+                                            iGang[3] = shouPai[iWhosCmd].info[Convert.ToInt32(iOrderG[2])];
+                                            Array.Sort(iGang);
+                                            if ((iGang[0] == iGang[1]) && (iGang[0] == iGang[2]) && (iGang[0] == iGang[3]))
+                                            {
+                                                iFlagCmd[iWhosCmd] = CPGZ_Level.Gang;
+                                            }
+                                        }
+                                        break;
+                                    case "抓":
+                                        iFlagCmd[iWhosCmd] = CPGZ_Level.Zhua; 
+                                        break;
                                     default: break;
                                 }
                             }
@@ -197,29 +219,65 @@ namespace BDMJprogram
                         //检查每个玩家状态，是否已经完成指令
                         isCPGZover = (iFlagCmd[0] != 0) && (iFlagCmd[1] != 0) && (iFlagCmd[2] != 0) && (iFlagCmd[3] != 0);
                     } while (isCPGZover == false);
+                    #endregion
 
                     //如果没有人吃碰杠抓，则轮到下家
                     if (iFlagCmd.Sum() == 4)
-                        whosTurn = ZUOWEI.Next(whosTurn);
-                    else //有人吃碰杠抓
                     {
+                        iCGP = 0;
+                        whosTurn = ZUOWEI.Next(whosTurn);
+                    }
+                    //有人吃碰杠抓
+                    else
+                    {
+                        iCGP = 1;
                         whosTurn = ArrarMaxIndex(iFlagCmd);
                         whosShouPai = shouPai[whosTurn];
                         //执行吃碰杠抓指令
                         int icmd = iFlagCmd[whosTurn];
-                        if (icmd == CPGZ_Level.Chi)
+                        string strCmd = strCmdRecord[whosTurn];
+                        string[] strCmds = strCmd.Split(';');
+                        if (icmd == CPGZ_Level.Chi) //吃指令处理
                         {
+                            int[] iChi = new int[3];
+                            string[] iOrderC = strCmds[2].Split(',');
+                            iChi[0] = LastChuPai;
+                            iChi[1] = whosShouPai.info[Convert.ToInt32(iOrderC[0])];
+                            iChi[2] = whosShouPai.info[Convert.ToInt32(iOrderC[1])];
+                            Array.Sort(iChi);//升序吃
+                            whosShouPai.AddCPG(iChi);
 
+                            whosShouPai.info[Convert.ToInt32(iOrderC[0])] = 99; //将手中碰牌修改为99
+                            whosShouPai.info[Convert.ToInt32(iOrderC[1])] = 99;
                         }
-                        else if(icmd == CPGZ_Level.Peng)
+                        else if(icmd == CPGZ_Level.Peng) //碰指令处理
                         {
+                            int[] iPeng = new int[3];
+                            string[] iOrderP = strCmds[2].Split(',');
+                            iPeng[0] = LastChuPai;
+                            iPeng[1] = whosShouPai.info[Convert.ToInt32(iOrderP[0])];
+                            iPeng[2] = whosShouPai.info[Convert.ToInt32(iOrderP[1])];
+                            whosShouPai.AddCPG(iPeng);
 
+                            whosShouPai.info[Convert.ToInt32(iOrderP[0])] = 99; //将手中碰牌修改为99
+                            whosShouPai.info[Convert.ToInt32(iOrderP[1])] = 99;
                         }
-                        else if (icmd == CPGZ_Level.Gang)
+                        else if (icmd == CPGZ_Level.Gang) //杠指令处理
                         {
+                            iCGP = 2;
+                            int[] iGang = new int[4];
+                            string[] iOrderG = strCmds[2].Split(',');
+                            iGang[0] = LastChuPai;
+                            iGang[1] = whosShouPai.info[Convert.ToInt32(iOrderG[0])];
+                            iGang[2] = whosShouPai.info[Convert.ToInt32(iOrderG[1])];
+                            iGang[3] = whosShouPai.info[Convert.ToInt32(iOrderG[2])];
+                            whosShouPai.AddCPG(iGang);
 
+                            whosShouPai.info[Convert.ToInt32(iOrderG[0])] = 99; //将手中碰牌修改为99
+                            whosShouPai.info[Convert.ToInt32(iOrderG[1])] = 99;
+                            whosShouPai.info[Convert.ToInt32(iOrderG[2])] = 99;
                         }
-                        else if (icmd == CPGZ_Level.Zhua)
+                        else if (icmd == CPGZ_Level.Zhua) //抓指令处理
                         {
 
                         }
@@ -228,6 +286,7 @@ namespace BDMJprogram
                 else
                     Recording.WriteLine("【吃碰杠抓】庄家首轮跳过");
 
+                #region 出杠胡
                 //确认回合
                 whosShouPai = shouPai[whosTurn];
                 Recording.WriteLine("【谁的回合】" + ZUOWEI.FengXiang[whosShouPai.Zuowei]);
@@ -236,7 +295,7 @@ namespace BDMJprogram
                 UpdateShouPaiHua(whosShouPai);
 
                 //摸牌&摸花
-                if (iCGP == false) //如果没有吃碰杠，则摸牌
+                if ((iCGP == 0) || (iCGP == 2)) //如果没有吃碰 或者 有人杠牌，则摸牌
                 {
                     whosShouPai.info[13] = PaiKu.Dequeue();
                     UpdateShouPaiHua(whosShouPai);
@@ -263,12 +322,35 @@ namespace BDMJprogram
                                 int iChuPaiOrder = Convert.ToInt32(cmd2[2]);
                                 LastChuPai = whosShouPai.info[iChuPaiOrder];
                                 whosShouPai.info[iChuPaiOrder] = 99;
-                                whosShouPai.LiPai2();
+                                whosShouPai.LiPai3(iChuPaiOrder);
                                 whosShouPai.HistoryPai.Enqueue(LastChuPai);
-                                //whosTurn = ZUOWEI.Next(whosTurn);
                                 isOver = true;
                                 break;
-                            case "杠": break;
+                            case "杠":
+                                int[] iGang = new int[4];
+                                string[] iOrderG = cmd2[2].Split(',');
+                                if (iOrderG.Length == 4)
+                                {
+                                    iGang[0] = whosShouPai.info[Convert.ToInt32(iOrderG[0])];
+                                    iGang[1] = whosShouPai.info[Convert.ToInt32(iOrderG[1])]; 
+                                    iGang[2] = whosShouPai.info[Convert.ToInt32(iOrderG[2])];
+                                    iGang[3] = whosShouPai.info[Convert.ToInt32(iOrderG[3])];
+                                    Array.Sort(iGang);
+                                    if ((iGang[0] == iGang[1]) && (iGang[0] == iGang[2]) && (iGang[0] == iGang[3]))
+                                    {
+                                        whosShouPai.AddCPG(iGang);
+                                        whosShouPai.info[Convert.ToInt32(iOrderG[0])] = 99; //将手中碰牌修改为99
+                                        whosShouPai.info[Convert.ToInt32(iOrderG[1])] = 99;
+                                        whosShouPai.info[Convert.ToInt32(iOrderG[2])] = 99;
+                                        whosShouPai.info[Convert.ToInt32(iOrderG[3])] = 99;
+                                        whosShouPai.LiPai2();
+                                        whosShouPai.info[13] = PaiKu.Dequeue();
+                                        UpdateShouPaiHua(whosShouPai);
+                                        UpdatePaikuInfo();//更新牌库信息
+                                        UpdateShouPaiInfo();//更新手牌信息
+                                    }
+                                }
+                                break;
                             case "胡": break;
                             default: break;
                         }
@@ -276,6 +358,7 @@ namespace BDMJprogram
                 } while (isOver == false);
 
                 UpdateShouPaiInfo();
+                #endregion
             } while (true);       
         }
 
@@ -523,6 +606,24 @@ namespace BDMJprogram
             }
             info = info99;
         }
+
+        /// <summary>
+        /// 出牌后，将出牌位置后的信息左移
+        /// </summary>
+        /// <param name="index_chupai"></param>
+        public void LiPai3(int index_chupai)
+        {
+            for (int i = index_chupai; i < 13; i++)
+            {
+                info[i] = info[i + 1];
+            }
+            info[13] = 99;
+        }
+
+        /// <summary>
+        /// 添加花色
+        /// </summary>
+        /// <param name="iHua"></param>
         public void AddHua(int iHua)
         {
             for (int i = 0; i < 8; i++)
@@ -532,6 +633,45 @@ namespace BDMJprogram
                     hua[i] = iHua;
                     break;
                 }
+            }
+        }
+        
+        public void AddCPG(int[] inputs)
+        {
+            int[] iNewCPG = new int[4] { 99, 99, 99, 99 };
+            int iMax = (inputs.Length > 4) ? 4 : inputs.Length;
+            for (int i = 0; i < iMax; i++) 
+            {
+                iNewCPG[i] = inputs[i];
+            }
+
+            if (this.CPG[0, 0] == 99)
+            {
+                this.CPG[0, 0] = iNewCPG[0];
+                this.CPG[0, 1] = iNewCPG[1];
+                this.CPG[0, 2] = iNewCPG[2];
+                this.CPG[0, 3] = iNewCPG[3];
+            }
+            else if (this.CPG[1, 0] == 99)
+            {
+                this.CPG[1, 0] = iNewCPG[0];
+                this.CPG[1, 1] = iNewCPG[1];
+                this.CPG[1, 2] = iNewCPG[2];
+                this.CPG[1, 3] = iNewCPG[3];
+            }
+            else if (this.CPG[2, 0] == 99)
+            {
+                this.CPG[2, 0] = iNewCPG[0];
+                this.CPG[2, 1] = iNewCPG[1];
+                this.CPG[2, 2] = iNewCPG[2];
+                this.CPG[2, 3] = iNewCPG[3];
+            }
+            else if (this.CPG[3, 0] == 99)
+            {
+                this.CPG[3, 0] = iNewCPG[0];
+                this.CPG[3, 1] = iNewCPG[1];
+                this.CPG[3, 2] = iNewCPG[2];
+                this.CPG[3, 3] = iNewCPG[3];
             }
         }
     }
@@ -545,7 +685,7 @@ namespace BDMJprogram
         static public string[] FengXiang = new string[5] { "东", "南", "西", "北", "空" };
         static public int Next(int iCurrent)
         {
-            iCurrent--;
+            iCurrent++;
             if (iCurrent > Bei) iCurrent = Dong;
             if (iCurrent < Dong) iCurrent = Bei;
             return iCurrent;
